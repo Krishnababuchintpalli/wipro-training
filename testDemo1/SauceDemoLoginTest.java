@@ -1,69 +1,66 @@
-package Day27;
+package Excel;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.openqa.selenium.*;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.support.ui.*;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeMethod;
 import org.testng.Assert;
-import org.testng.annotations.*;
-import java.time.Duration;
+import org.testng.annotations.AfterMethod;
+
 
 public class SauceDemoLoginTest {
 
-    private static final Logger logger = LogManager.getLogger(SauceDemoLoginTest.class);
-
     WebDriver driver;
-    WebDriverWait wait;
 
-    @BeforeClass
-    public void setup() {
-        logger.info("Launching the browser and navigating to SauceDemo site");
+    @BeforeMethod
+    public void setUp() {
         driver = new ChromeDriver();
         driver.manage().window().maximize();
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
-        wait = new WebDriverWait(driver, Duration.ofSeconds(10));
         driver.get("https://www.saucedemo.com/");
     }
 
-    @Test
-    public void testLogin() {
-        try {
-            logger.info("Entering username");
-            WebElement username = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("user-name")));
-            username.sendKeys("standard_user");
-
-            logger.info("Entering password");
-            WebElement password = driver.findElement(By.id("password"));
-            password.sendKeys("secret_sauce");
-
-            logger.info("Clicking Login button");
-            WebElement loginBtn = driver.findElement(By.id("login-button"));
-            loginBtn.click();
-
-            logger.info("Checking if Products page is displayed");
-            WebElement productsTitle = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("title")));
-            Assert.assertTrue(productsTitle.isDisplayed(), "Login failed!");
-            System.out.println("✅ Login successful, Products page found!");
-            logger.info("Login successful!");
-
-        } catch (NoSuchElementException e) {
-            logger.error("Element not found: " + e.getMessage());
-            Assert.fail("Test failed due to missing element.");
-        } catch (TimeoutException e) {
-            logger.error("Timeout while waiting: " + e.getMessage());
-            Assert.fail("Test failed due to timeout.");
-        } catch (Exception e) {
-            logger.error("Unexpected error: " + e.getMessage());
-            Assert.fail("Test failed due to unexpected exception.");
-        }
+    @AfterMethod
+    public void tearDown() throws InterruptedException {
+        Thread.sleep(3000); // just to see result clearly in demo
+        driver.quit();
     }
 
-    @AfterClass
-    public void tearDown() {
-        if (driver != null) {
-            logger.info("Closing the browser");
-            driver.quit();
+
+// “Before each data row, we launch a fresh Chrome and open the login page.”
+
+
+// “After each run, we close the browser. This keeps tests independent.”
+
+
+    @Test(dataProvider = "loginData", dataProviderClass = SauceDemoDataProvider.class)
+    public void loginTest(String username, String password, String expected) {
+        driver.findElement(By.id("user-name")).sendKeys(username);
+        driver.findElement(By.id("password")).sendKeys(password);
+        driver.findElement(By.id("login-button")).click();
+
+        if (expected.equals("success")) {
+            // On successful login, URL changes to /inventory.html
+            String currentUrl = driver.getCurrentUrl();
+            Assert.assertTrue(currentUrl.contains("inventory"), 
+                              "Login failed for valid user: " + username);
+            System.out.println("Login successful for user: " + username);
+
+        } else if (expected.equals("locked")) {
+            // Locked out user gets a specific error
+            String errorMsg = driver.findElement(By.cssSelector("h3[data-test='error']")).getText();
+            Assert.assertTrue(errorMsg.contains("locked out"),
+                              "Expected locked out error but got: " + errorMsg);
+            System.out.println("User locked out: " + username);
+
+        } else if (expected.equals("invalid")) {
+            // Invalid credentials show invalid username/password error
+            String errorMsg = driver.findElement(By.cssSelector("h3[data-test='error']")).getText();
+            Assert.assertTrue(errorMsg.contains("Username and password do not match") 
+                           || errorMsg.contains("do not match"), 
+                           "Expected invalid login error but got: " + errorMsg);
+            System.out.println("Invalid login for user: " + username);
+
         }
     }
 }
